@@ -1,0 +1,38 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/daniel/Documents/cushion/boost_for_export.h
+boost/python.hpp
+-
+boost/shared_ptr.hpp
+-
+boost/python/args.hpp
+-
+boost/python/suite/indexing/vector_indexing_suite.hpp
+-
+boost/python/suite/indexing/map_indexing_suite.hpp
+-
+boost/python/operators.hpp
+-
+
+/home/daniel/Documents/cushion/cush.cpp
+string
+-
+cmath
+-
+cush.h
+/home/daniel/Documents/cushion/cush.h
+boost/python.hpp
+-
+
+/home/daniel/Documents/cushion/cush.h
+vector
+-
+boost_for_export.h
+/home/daniel/Documents/cushion/boost_for_export.h
+

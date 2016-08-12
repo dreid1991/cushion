@@ -1,0 +1,1 @@
+/usr/bin/c++  -fPIC  -std=c++11 -fpic    -shared -Wl,-soname,libCush.so -o libCush.so CMakeFiles/Cush.dir/boost_stls.cpp.o CMakeFiles/Cush.dir/cush.cpp.o -lpython2.7 -lboost_python 

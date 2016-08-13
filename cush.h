@@ -6,9 +6,11 @@ void export_ImpactResult();
 void export_Sim();
 class ImpactResult {
 public:
-    double foo;
     vector<double> times;
     vector<double> pressures;
     vector<double> depths;
     vector<double> velocities; 
+    double avgPressure;
+    double stdevPressure;
+    bool failed;
 };

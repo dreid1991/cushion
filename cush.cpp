@@ -21,17 +21,25 @@ double calcVolDot(double velImp, double massImp, double press, double area, doub
     return -velImp * area;
 }
 
-double calcNDot(double press, double temp, vector<double> &holeSizes) {
+double calcNDot(double press, double temp, vector<double> &holeSizes, vector<double> &molesPer, double dt) {
     double molPerVolume = press / (R * temp);
     double massPerMol = 0.028 * .79 + 0.032 * .21; //79% N2, 21% O2
     double massPerVol = molPerVolume * massPerMol;
 
     double gasVel = sqrt(2/massPerVol * (press - pAtm));
     double nDot = 0;
-    for (double holeSize : holeSizes) {
-        nDot += holeSize * gasVel * molPerVolume;
+    for (int i=0; i<holeSizes.size(); i++) {
+        double nDotThis = -holeSizes[i] * gasVel * molPerVolume;
+        double per = molesPer[i];
+        if (per - nDotThis*dt < 0) {
+            molesPer[i] = 0;
+            nDot += per/dt;
+        } else {
+            molesPer[i] += nDotThis * dt;
+            nDot += nDotThis;
+        }
     }
-    return -nDot;
+    return nDot;
 }
 
 
@@ -41,10 +49,11 @@ ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, d
         double size = py::extract<double>(holeSizes_py[i]);
         holeSizes.push_back(size);
     }
-    double moles = pressInit * volInit / (R * tempInit);
+    double molesTotal = pressInit * volInit / (R * tempInit);
     double press = pressInit;
     double temp = tempInit;
     vector<double> temps(holeSizes.size(), tempInit);
+    vector<double> molesPer(holeSizes.size(), molesTotal/holeSizes.size());
     double velImp = velImpInit;
     double velImpNext = velImp;
     double vol = volInit;
@@ -59,25 +68,38 @@ ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, d
     };
     appendData();
     int i=0;
-    printf("time vol vel press moles engOnImp\n");
-    while (velImpNext > .0001*velImpInit and vol > 0 and 1000 > time) {
+    while (velImpNext > .0001*velImpInit and vol > volInit*0.01 and 1000 > time) {
         //printf("NEW TURN\n");
         double volDot = calcVolDot(velImp, massImp, press, area, dt, &velImpNext);
        // printf("volDot is %f\n", volDot);
-        double molesDot = calcNDot(press, temp, holeSizes);
-        double pressDot = molesDot * R * temp / vol - moles * R * temp * volDot / (vol * vol);
+        double molesDot = calcNDot(press, temp, holeSizes, molesPer, dt);
+        double pressDot = molesDot * R * temp / vol - molesTotal * R * temp * volDot / (vol * vol);
 
         engOnImp += (press-pAtm) * area * velImp * dt;
         velImp = velImpNext;
 
         vol += volDot * dt;
         press += pressDot * dt;
-        moles += molesDot * dt;
+        molesTotal = accumulate(molesPer.begin(), molesPer.end(), 0.0);
         time += dt;
         appendData();
         i++;
     }
-    printf("%f %f %f %f %f %f\n", time, vol, velImp, press, moles, engOnImp);
+    res.failed = false;
+    if (vol <= volInit*.01) {
+        res.failed = true;
+    }
+    double avgPressure = accumulate(res.pressures.begin(), res.pressures.end(), 0.0) / res.pressures.size();
+    double sumDiff = 0;
+    for (double x : res.pressures) {
+        double diff = avgPressure - x;
+        sumDiff += diff*diff;
+    }
+    sumDiff /= res.pressures.size();
+    double stdev = sqrt(sumDiff);
+    res.avgPressure = avgPressure;
+    res.stdevPressure = stdev;
+    //printf("%f %f %f %f %f %f\n", time, vol, velImp, press, moles, engOnImp);
     return res;
 }
 
@@ -106,7 +128,7 @@ class Dummy {
 //double velImpInit, double massImp, double tempInit, double volInit, double area, double pressInit, vector<double> holeSizes, double dt
 void export_Sim() {
     py::class_<Dummy>("Sim")
-        .def("run", &runSimulation, (py::arg("velImp"), py::arg("massImp"), py::arg("temp")=300, py::arg("vol"), py::arg("area")=1, py::arg("press")=101325, py::arg("holeSizes"), py::arg("dt")))
+        .def("run", &runSimulation, (py::arg("velImp"), py::arg("massImp"), py::arg("temp")=300, py::arg("vol"), py::arg("area")=1, py::arg("press")=101325, py::arg("holeSizes"), py::arg("dt")=0.00000001))
         .staticmethod("run");
         ;
 }
@@ -116,5 +138,8 @@ void export_ImpactResult() {
         .def_readwrite("pressures", &ImpactResult::pressures)
         .def_readwrite("depths", &ImpactResult::depths)
         .def_readwrite("velocities", &ImpactResult::velocities)
+        .def_readwrite("avgPressure", &ImpactResult::avgPressure)
+        .def_readwrite("stdevPressure", &ImpactResult::stdevPressure)
+        .def_readwrite("failed", &ImpactResult::failed)
         ;
 }

@@ -28,7 +28,8 @@ def permuteHoles(holes):
 monteCarloTemp = 1.
 
 def run(holes):
-    return Sim.run(velImp=25, massImp=1, vol=.01, holeSizes=holes)
+    #return Sim.run(velImp=25, massImp=1, vol=.01, holeSizes=holes) #ORIG
+    return Sim.run(velImp=25, massImp=1, vol=.025, holeSizes=holes)
 def evalObjective(holes, targetPressure):
     res = run(holes)
     if res.failed:
@@ -39,9 +40,12 @@ def evalObjective(holes, targetPressure):
 def plot(holes, iteration):
     res = run(holes)
     plt.plot(list(res.depths), [toGauge(x) for x in list(res.pressures)], '-', linewidth=2.5, label=str(iteration))
+    #plt.plot(list(res.depths), list(res.molesTotal), '-', linewidth=2.5, label=str(iteration))
+    #plt.plot(list(res.depths), list(res.velocities), '-', linewidth=2.5, label=str(iteration))
 
 def iterate(targetPressure):
-    holes = list(np.linspace(0, 0.005, 50))
+    #holes = list(np.linspace(0, 0.005, 50)) #ORIG
+    holes = list(np.linspace(0, 0.005, 50)) #ORIG
     objective = evalObjective(holes, targetPressure)
     plot(holes, 0)
     for i in range(1):
@@ -61,7 +65,8 @@ def iterate(targetPressure):
     return holes
 
 
-holes = iterate(0.6)
+#holes = iterate(0.6)
+holes = list(np.linspace(0, 0.005, 50)) #ORIG
 plot(holes, 1)
 plt.xlabel('Impactor depth (meters)')
 plt.ylabel('Pressure (atm)')

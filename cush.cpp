@@ -31,7 +31,7 @@ double calcNDot(double press, double temp, vector<double> &holeSizes, vector<dou
     for (int i=0; i<holeSizes.size(); i++) {
         double nDotThis = -holeSizes[i] * gasVel * molPerVolume;
         double per = molesPer[i];
-        if (per - nDotThis*dt < 0) {
+        if (per + nDotThis*dt <= 0) {
             molesPer[i] = 0;
             nDot += per/dt;
         } else {
@@ -65,6 +65,7 @@ ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, d
         res.pressures.push_back(press);
         res.depths.push_back(volInit/area - vol/area);
         res.velocities.push_back(velImp);
+        res.molesTotal.push_back(molesTotal);
     };
     appendData();
     int i=0;
@@ -138,6 +139,7 @@ void export_ImpactResult() {
         .def_readwrite("pressures", &ImpactResult::pressures)
         .def_readwrite("depths", &ImpactResult::depths)
         .def_readwrite("velocities", &ImpactResult::velocities)
+        .def_readwrite("molesTotal", &ImpactResult::molesTotal)
         .def_readwrite("avgPressure", &ImpactResult::avgPressure)
         .def_readwrite("stdevPressure", &ImpactResult::stdevPressure)
         .def_readwrite("failed", &ImpactResult::failed)

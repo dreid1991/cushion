@@ -10,6 +10,7 @@ public:
     vector<double> pressures;
     vector<double> depths;
     vector<double> velocities; 
+    vector<double> molesTotal;
     double avgPressure;
     double stdevPressure;
     bool failed;

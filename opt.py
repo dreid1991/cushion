@@ -4,17 +4,26 @@ from random import *
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.rc('font', size=14)
+matplotlib.rc('font', size=22)
 sys.path.append('/home/daniel/Documents/cushion/build/python/build/lib.linux-x86_64-2.7/')
 from Cush import *
+import copy
+
+class RunInfo:
+    def __init__(self, velocityImp, massImp, volSys, holes):
+        self.velocityImp = velocityImp
+        self.massImp = massImp
+        self.volSys = volSys
+        self.holes = holes
+
 def toGauge(p):
     return (p-101325)/101325.
 def toAtm(p):
     return p/101325.
 objectiveInit = 1000000000.
-trialMoveSize = 0.00005
+trialMoveSize = 0.000001
 def permuteHoles(holes):
-    idx = int(random() * len(holes))
+    idx = int(random() * (len(holes)-1))+1 #so ignoring first hole - stays at zero
     val = holes[idx]
     if random() > 0.5:
         val += trialMoveSize
@@ -25,48 +34,102 @@ def permuteHoles(holes):
     holes[idx] = val
     return holes
 
-monteCarloTemp = 1.
+monteCarloTemp = .000002
 
-def run(holes):
-    #return Sim.run(velImp=25, massImp=1, vol=.01, holeSizes=holes) #ORIG
-    return Sim.run(velImp=25, massImp=1, vol=.025, holeSizes=holes)
-def evalObjective(holes, targetPressure):
-    res = run(holes)
+def run(runInfo):
+   # return Sim.run(velImp=25, massImp=1, vol=.01, holeSizes=holes) #ORIG
+    return Sim.run(velImp=runInfo.velocityImp, massImp=runInfo.massImp, vol=runInfo.volSys, holeSizes=runInfo.holes, dt=1e-7, writeEvery=10)
+
+def evalObjective(runInfo):
+    res = run(runInfo)
     if res.failed:
         return 100
     print toGauge(res.avgPressure), toAtm(res.stdevPressure)
-    return abs(res.avgPressure - targetPressure) + res.stdevPressure
+    return toGauge(res.avgPressure) + toAtm(res.stdevPressure)
 
-def plot(holes, iteration):
-    res = run(holes)
-    plt.plot(list(res.depths), [toGauge(x) for x in list(res.pressures)], '-', linewidth=2.5, label=str(iteration))
-    #plt.plot(list(res.depths), list(res.molesTotal), '-', linewidth=2.5, label=str(iteration))
-    #plt.plot(list(res.depths), list(res.velocities), '-', linewidth=2.5, label=str(iteration))
+def plot(runInfo, iteration):
+    res = run(runInfo)
+    print len(res.depths)
+    print len(res.pressures)
+    plt.plot([100*x for x in list(res.depths)], [toGauge(x) for x in list(res.pressures)], '-', linewidth=2.5, label=iteration)
+    #plt.plot(list(res.times), list(res.velocities), '-', linewidth=2.5, label=iteration)
 
-def iterate(targetPressure):
+
+
+def readInfo(src):
+    f = open(src, 'r')
+    lines = f.readlines()
+    velocity = float(lines[0].split()[1])
+    mass = float(lines[1].split()[1])
+    volSys = float(lines[2].split()[1])
+    holes = eval(lines[3])
+    return RunInfo(velocity, mass, volSys, holes)
+
+
+def writeInfo(fn, runInfo):
+    f = open(fn, 'w')
+    f.write('velocityImp %f\n' % runInfo.velocityImp)
+    f.write('massImp %f\n' % runInfo.massImp)
+    f.write('volSys %f\n' % runInfo.volSys)
+    f.write(repr(list(runInfo.holes)))
+    f.close()
+#return Sim.run(velImp=25, massImp=1, vol=.025, holeSizes=holes)
+
+
+def iterate(nTurns, src=None, runInfo=None):
     #holes = list(np.linspace(0, 0.005, 50)) #ORIG
-    holes = list(np.linspace(0, 0.005, 50)) #ORIG
-    objective = evalObjective(holes, targetPressure)
-    plot(holes, 0)
-    for i in range(1):
-        holesTrial = permuteHoles(holes[:])
-        objectiveTrial = evalObjective(holesTrial, targetPressure)
+    if runInfo == None:
+        runInfo = readInfo(src)
+
+    plot(runInfo, 'Initial')
+    return runInfo
+    objective = evalObjective(runInfo)
+    for i in range(nTurns):
+        print 'hi'
+        holesTrial = permuteHoles(runInfo.holes[:])
+        infoTrial = copy.deepcopy(runInfo)
+        infoTrial.holes = holesTrial
+        objectiveTrial = evalObjective(infoTrial)
         if objectiveTrial < objective:
-            holes = holesTrial
+            runInfo.holes = holesTrial
             objective = objectiveTrial
         else:
             dFit = objectiveTrial - objective
             prob = exp(-dFit / monteCarloTemp)
+           # print 'prob %f arg %f ' % (prob, dFit)
             if random() < prob:
-                holes = holesTrial
+                runInfo.holes = holesTrial
                 objective = objectiveTrial
-        print holes
+        print objective
+        if objective < 0.03:
+            break
+        #print holes
     print holes
-    return holes
+    return runInfo
 
+#writeInfo('setup.dat', RunInfo(25, 1, 0.25, np.linspace(0, 0.005, 50)))
+writeInfo('setup.dat', RunInfo(25, 1, 0.025, np.linspace(0, 0.005, 50)))
+res = iterate(30, 'setup.dat')
+writeInfo('out.dat', res)
+plt.show()
+        #plot(list(np.linspace(0, 0.005, 50)), 'Unoptimized')
 
-#holes = iterate(0.6)
-holes = list(np.linspace(0, 0.005, 50)) #ORIG
+#holes = iterate() #target not used
+#plt.xlabel('Impactor depth (cm)')
+#plt.ylabel('Pressure (atm)')
+#plt.legend(loc='upper left')
+
+#plt.ylim(0, 1.1)
+#plt.tight_layout()
+##plt.show()
+#plt.show()
+#plt.savefig('opt.png')
+
+exit()
+#f = open('holes.dat', 'w')
+#f.write(str(holes))
+#f.close()
+#holes = list(np.linspace(0, 0.005, 50)) #ORIG
 plot(holes, 1)
 plt.xlabel('Impactor depth (meters)')
 plt.ylabel('Pressure (atm)')
@@ -85,3 +148,6 @@ plt.show()
 #plt.clf()
 #plt.plot(list(res2.times), list(res2.velocities))
 #plt.show()
+
+
+

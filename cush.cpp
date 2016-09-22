@@ -33,7 +33,7 @@ double calcNDot(double press, double temp, vector<double> &holeSizes, vector<dou
         double per = molesPer[i];
         if (per + nDotThis*dt <= 0) {
             molesPer[i] = 0;
-            nDot += per/dt;
+            nDot -= per/dt;
         } else {
             molesPer[i] += nDotThis * dt;
             nDot += nDotThis;
@@ -42,8 +42,7 @@ double calcNDot(double press, double temp, vector<double> &holeSizes, vector<dou
     return nDot;
 }
 
-
-ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, double volInit, double area, double pressInit, py::list holeSizes_py, double dt) {
+ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, double volInit, double area, double pressInit, py::list holeSizes_py, double dt, int writeEvery) {
     vector<double> holeSizes;
     for (int i=0; i<py::len(holeSizes_py); i++) {
         double size = py::extract<double>(holeSizes_py[i]);
@@ -83,7 +82,9 @@ ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, d
         press += pressDot * dt;
         molesTotal = accumulate(molesPer.begin(), molesPer.end(), 0.0);
         time += dt;
-        appendData();
+        if (!(i%writeEvery)) {
+            appendData();
+        }
         i++;
     }
     res.failed = false;
@@ -129,7 +130,7 @@ class Dummy {
 //double velImpInit, double massImp, double tempInit, double volInit, double area, double pressInit, vector<double> holeSizes, double dt
 void export_Sim() {
     py::class_<Dummy>("Sim")
-        .def("run", &runSimulation, (py::arg("velImp"), py::arg("massImp"), py::arg("temp")=300, py::arg("vol"), py::arg("area")=1, py::arg("press")=101325, py::arg("holeSizes"), py::arg("dt")=0.00000001))
+        .def("run", &runSimulation, (py::arg("velImp"), py::arg("massImp"), py::arg("temp")=300, py::arg("vol"), py::arg("area")=1, py::arg("press")=101325, py::arg("holeSizes"), py::arg("dt")=1e-8, py::arg("writeEvery")=1))
         .staticmethod("run");
         ;
 }

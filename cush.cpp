@@ -31,7 +31,7 @@ double calcNDot(double press, double temp, vector<double> &holeSizes, vector<dou
     for (int i=0; i<holeSizes.size(); i++) {
         double nDotThis = -holeSizes[i] * gasVel * molPerVolume;
         double per = molesPer[i];
-        if (per + nDotThis*dt <= 0) {
+        if (per + nDotThis*dt < 0) {
             molesPer[i] = 0;
             nDot -= per/dt;
         } else {
@@ -42,7 +42,7 @@ double calcNDot(double press, double temp, vector<double> &holeSizes, vector<dou
     return nDot;
 }
 
-ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, double volInit, double area, double pressInit, py::list holeSizes_py, double dt, int writeEvery) {
+ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, double volInit, double area, double pressInit, py::list holeSizes_py, double dtInit, int writeEvery) {
     vector<double> holeSizes;
     for (int i=0; i<py::len(holeSizes_py); i++) {
         double size = py::extract<double>(holeSizes_py[i]);
@@ -65,10 +65,12 @@ ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, d
         res.depths.push_back(volInit/area - vol/area);
         res.velocities.push_back(velImp);
         res.molesTotal.push_back(molesTotal);
+        res.molesPer.push_back(molesPer);
     };
     appendData();
     int i=0;
     while (velImpNext > .0001*velImpInit and vol > volInit*0.01 and 1000 > time) {
+        double dt = fmin(100 * dtInit, dtInit * sqrt(velImpInit / velImp));
         //printf("NEW TURN\n");
         double volDot = calcVolDot(velImp, massImp, press, area, dt, &velImpNext);
        // printf("volDot is %f\n", volDot);
@@ -127,11 +129,55 @@ int main() {
 
 class Dummy {
 };
+
+
+class AnalyzeDummy{
+};
+
+double integral(vector<double> &xs, vector<double> &ys) {
+    assert(xs.size()==ys.size());
+    double sum = 0;
+    for (int i=0; i<xs.size()-1; i++) {
+        double height = 0.5 * (ys[i] + ys[i+1]);
+        sum += height * (xs[i+1] - xs[i]);
+    }
+    return sum;
+}
+double integralSqr(vector<double> &xs, vector<double> &ys) {
+    assert(xs.size()==ys.size());
+    double sum = 0;
+    for (int i=0; i<xs.size()-1; i++) {
+        double height = 0.5 * (ys[i] + ys[i+1]);
+        sum += height * height * (xs[i+1] - xs[i]);
+    }
+    return sum;
+}
+vector<double> add(vector<double> &xs, double y) {
+    vector<double> res(xs.size());
+    for (int i=0; i<xs.size(); i++) {
+        res[i] = xs[i] + y;
+    }
+    return res;
+}
+
+
 //double velImpInit, double massImp, double tempInit, double volInit, double area, double pressInit, vector<double> holeSizes, double dt
 void export_Sim() {
     py::class_<Dummy>("Sim")
         .def("run", &runSimulation, (py::arg("velImp"), py::arg("massImp"), py::arg("temp")=300, py::arg("vol"), py::arg("area")=1, py::arg("press")=101325, py::arg("holeSizes"), py::arg("dt")=1e-8, py::arg("writeEvery")=1))
         .staticmethod("run");
+        ;
+}
+void export_Analyze() {
+    py::class_<AnalyzeDummy>("Analyze")
+        .def("integral", &integral)
+        .staticmethod("integral")
+
+        .def("integralSqr", &integralSqr)
+        .staticmethod("integralSqr")
+
+        .def("add", &add)
+        .staticmethod("add")
         ;
 }
 void export_ImpactResult() {
@@ -141,6 +187,7 @@ void export_ImpactResult() {
         .def_readwrite("depths", &ImpactResult::depths)
         .def_readwrite("velocities", &ImpactResult::velocities)
         .def_readwrite("molesTotal", &ImpactResult::molesTotal)
+        .def_readwrite("molesPer", &ImpactResult::molesPer)
         .def_readwrite("avgPressure", &ImpactResult::avgPressure)
         .def_readwrite("stdevPressure", &ImpactResult::stdevPressure)
         .def_readwrite("failed", &ImpactResult::failed)

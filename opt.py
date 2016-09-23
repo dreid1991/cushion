@@ -1,4 +1,6 @@
 import sys
+import os
+import copy
 from math import *
 from random import *
 import numpy as np
@@ -7,7 +9,6 @@ import matplotlib
 matplotlib.rc('font', size=22)
 sys.path.append('/home/daniel/Documents/cushion/build/python/build/lib.linux-x86_64-2.7/')
 from Cush import *
-import copy
 
 class RunInfo:
     def __init__(self, velocityImp, massImp, volSys, holes):
@@ -21,7 +22,7 @@ def toGauge(p):
 def toAtm(p):
     return p/101325.
 objectiveInit = 1000000000.
-trialMoveSize = 0.000001
+trialMoveSize = 0.00001
 def permuteHoles(holes):
     idx = int(random() * (len(holes)-1))+1 #so ignoring first hole - stays at zero
     val = holes[idx]
@@ -43,16 +44,14 @@ def run(runInfo):
 def evalObjective(runInfo):
     res = run(runInfo)
     if res.failed:
-        return 100
-    print toGauge(res.avgPressure), toAtm(res.stdevPressure)
-    return toGauge(res.avgPressure) + toAtm(res.stdevPressure)
+        return 1e10
+    return Analyze.integralSqr(res.depths, Analyze.add(res.pressures, -101325))
 
-def plot(runInfo, iteration):
+def plot(runInfo, iteration, zorder = 1):
     res = run(runInfo)
-    print len(res.depths)
-    print len(res.pressures)
-    plt.plot([100*x for x in list(res.depths)], [toGauge(x) for x in list(res.pressures)], '-', linewidth=2.5, label=iteration)
+    plt.plot([100*x for x in list(res.depths)], [toGauge(x) for x in list(res.pressures)], '-', linewidth=2.5, label=iteration, zorder=zorder)
     #plt.plot(list(res.times), list(res.velocities), '-', linewidth=2.5, label=iteration)
+    return res
 
 
 
@@ -81,11 +80,9 @@ def iterate(nTurns, src=None, runInfo=None):
     if runInfo == None:
         runInfo = readInfo(src)
 
-    plot(runInfo, 'Initial')
-    return runInfo
+    plot(runInfo, 'Loaded')
     objective = evalObjective(runInfo)
     for i in range(nTurns):
-        print 'hi'
         holesTrial = permuteHoles(runInfo.holes[:])
         infoTrial = copy.deepcopy(runInfo)
         infoTrial.holes = holesTrial
@@ -100,54 +97,72 @@ def iterate(nTurns, src=None, runInfo=None):
             if random() < prob:
                 runInfo.holes = holesTrial
                 objective = objectiveTrial
-        print objective
         if objective < 0.03:
             break
+        print i, objective
         #print holes
-    print holes
     return runInfo
 
-#writeInfo('setup.dat', RunInfo(25, 1, 0.25, np.linspace(0, 0.005, 50)))
-writeInfo('setup.dat', RunInfo(25, 1, 0.025, np.linspace(0, 0.005, 50)))
-res = iterate(30, 'setup.dat')
-writeInfo('out.dat', res)
-plt.show()
-        #plot(list(np.linspace(0, 0.005, 50)), 'Unoptimized')
+#writeInfo('setup.dat', RunInfo(25, 1, 0.025, np.linspace(0, 0.005, 50)))
+#appromiximating ball as 8cm * 8cm * 8cm cube
+surfAreaActual = 0.08 * 0.08 #m^2
+nBalls = 4
+vol = 1.0 * 1.0 * 0.08 * nBalls
+holesInit = [0.] * nBalls
+massReal = 0.5 #kg
+massImp = massReal / surfAreaActual
+x = 5 #meters
+a = 9.81 #m/s^2
+vImpact = 10#sqrt(2*x*a)
 
-#holes = iterate() #target not used
-#plt.xlabel('Impactor depth (cm)')
-#plt.ylabel('Pressure (atm)')
-#plt.legend(loc='upper left')
-
-#plt.ylim(0, 1.1)
-#plt.tight_layout()
-##plt.show()
-#plt.show()
+plot(RunInfo(vImpact, massImp, vol, holesInit), 'Initial')
+#if os.path.isfile('out.dat'):
+info = readInfo('out_opt.dat')
+#else:
+#    info = RunInfo(vImpact, massImp, vol, holesInit)
+#writeInfo('setup.dat', RunInfo(vImpact, massImp, vol, holesInit))
+#runInfo = iterate(10000, runInfo = info)
+#os.system('mv out.dat out_prev.dat')
+#writeInfo('out.dat', runInfo)
+res = plot(info, 'Final')
+plt.xlabel('Impactor depth (cm)')
+plt.ylabel('Pressure (atm)')
+plt.ylim(0., 0.8)
+plt.tight_layout()
 #plt.savefig('opt.png')
+plt.clf()
+'''
+for i in range(nBalls):
+    moles = [x[i] for x in res.molesPer]
+    plt.plot([100*x for x in list(res.depths)], moles, linewidth=2.5)
+plt.xlabel('Impactor depth (cm)')
+plt.ylabel('n moles')
+
+plt.tight_layout()
+plt.savefig('nmoles.svg')
+plt.savefig('nmoles.png')
+plt.show()
+'''
+opt = readInfo('out_opt.dat')
+maxZ = 11
+for i, x in enumerate(np.linspace(0, 320, maxZ)[1:]):
+    print x* 0.08**2
+    opt.massImp= x
+    #opt.velocityImp= x
+    plot(opt, 'V = %04f' % x, zorder = maxZ-i)
+plt.xlabel('Depth (cm)')
+plt.ylabel('Pressure (atm)')
+#plt.xlim(0, 32)
+plt.ylim(0, 4)
+plt.tight_layout()
+for x in ['png', 'svg']:
+    plt.savefig('impact_to_320_kg.%s' % x)
+plt.show()
+
+
+
+
+
 
 exit()
-#f = open('holes.dat', 'w')
-#f.write(str(holes))
-#f.close()
-#holes = list(np.linspace(0, 0.005, 50)) #ORIG
-plot(holes, 1)
-plt.xlabel('Impactor depth (meters)')
-plt.ylabel('Pressure (atm)')
-plt.legend()
-plt.show()
-
-
-#res = Sim.run(velImp=5, massImp=1, vol=.01, holeSizes=[0.0005])
-#res2 = Sim.run(velImp=25, massImp=1, vol=.01, holeSizes=[0.00])
-#plt.plot(list(res.times), [toGauge(x) for x in list(res.pressures)])
-#plt.plot(list(res2.depths), [toGauge(x) for x in list(res2.pressures)], '-', linewidth=2.5)
-#plt.xlabel('Impactor depth (meters)')
-#plt.ylabel('Pressure (atm)')
-#plt.savefig('ideal_gas_compare.svg')
-#plt.show()
-#plt.clf()
-#plt.plot(list(res2.times), list(res2.velocities))
-#plt.show()
-
-
 

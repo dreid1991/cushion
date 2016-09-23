@@ -3,6 +3,7 @@
 #include "boost_for_export.h"
 using namespace std;
 void export_ImpactResult();
+void export_Analyze();
 void export_Sim();
 class ImpactResult {
 public:
@@ -11,6 +12,7 @@ public:
     vector<double> depths;
     vector<double> velocities; 
     vector<double> molesTotal;
+    vector<vector<double> > molesPer;
     double avgPressure;
     double stdevPressure;
     bool failed;

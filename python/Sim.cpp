@@ -15,5 +15,6 @@ using namespace std;
 BOOST_PYTHON_MODULE(Cush) {
     export_stls();
     export_Sim();
+    export_Analyze();
     export_ImpactResult();
 }

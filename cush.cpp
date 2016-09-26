@@ -39,6 +39,7 @@ double calcNDot(double press, double temp, vector<double> &holeSizes, vector<dou
             nDot += nDotThis;
         }
     }
+
     return nDot;
 }
 
@@ -69,7 +70,7 @@ ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, d
     };
     appendData();
     int i=0;
-    while (velImpNext > .0001*velImpInit and vol > volInit*0.01 and 1000 > time) {
+    while (velImpNext > .0001*velImpInit and vol > volInit*0.01 and 1000 > time and i < 3000) {
         double dt = fmin(100 * dtInit, dtInit * sqrt(velImpInit / velImp));
         //printf("NEW TURN\n");
         double volDot = calcVolDot(velImp, massImp, press, area, dt, &velImpNext);

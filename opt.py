@@ -39,7 +39,7 @@ monteCarloTemp = .000002
 
 def run(runInfo):
    # return Sim.run(velImp=25, massImp=1, vol=.01, holeSizes=holes) #ORIG
-    return Sim.run(velImp=runInfo.velocityImp, massImp=runInfo.massImp, vol=runInfo.volSys, holeSizes=runInfo.holes, dt=1e-7, writeEvery=10)
+    return Sim.run(velImp=runInfo.velocityImp, massImp=runInfo.massImp, vol=runInfo.volSys, holeSizes=runInfo.holes, dt=1e-7, writeEvery=1)
 
 def evalObjective(runInfo):
     res = run(runInfo)
@@ -103,6 +103,20 @@ def iterate(nTurns, src=None, runInfo=None):
         #print holes
     return runInfo
 
+
+def calcDMoles(pressure, holeSize):
+
+    pressureG = toGauge(pressure) * 101325
+    molesPerVolume = pressure / (8.314 * 300)
+    massPerMole = 0.028*0.79 + 0.032 * 0.21
+    massPerVol = molesPerVolume * massPerMole
+    #massSpc = 1.275#from wiki, calc to verify
+    v = sqrt(2*pressureG / massPerVol)
+    print 'velPy %f' % v
+    volumeLeaving = v * holeSize
+    nMolesLeaving = molesPerVolume * volumeLeaving
+    return -nMolesLeaving
+
 #writeInfo('setup.dat', RunInfo(25, 1, 0.025, np.linspace(0, 0.005, 50)))
 #appromiximating ball as 8cm * 8cm * 8cm cube
 surfAreaActual = 0.08 * 0.08 #m^2
@@ -131,16 +145,24 @@ plt.ylim(0., 0.8)
 plt.tight_layout()
 #plt.savefig('opt.png')
 plt.clf()
-'''
+colors = ['r', 'g', 'b', 'k']
 for i in range(nBalls):
     moles = [x[i] for x in res.molesPer]
-    plt.plot([100*x for x in list(res.depths)], moles, linewidth=2.5)
-plt.xlabel('Impactor depth (cm)')
+    dMolesDt = [(res.molesPer[j+1][i] - res.molesPer[j][i]) / (res.times[j+1] - res.times[j]) for j in range(0, len(res.times)-1)]
+    dMolesDtCalc = [calcDMoles(pressure, info.holes[i]) for pressure in res.pressures]
+    plt.plot(res.times, dMolesDtCalc, '--', color=colors[i], linewidth=3.5)
+    #plt.plot(res.times, moles, linewidth=2.5)
+    plt.plot(list(res.times)[:-1], dMolesDt, linewidth=2.5, color=colors[i])
+press = [toGauge(p) for p in res.pressures]
+plt.plot(res.times, press)
+
+plt.xlabel('Times')
 plt.ylabel('n moles')
 
+
 plt.tight_layout()
-plt.savefig('nmoles.svg')
-plt.savefig('nmoles.png')
+#plt.savefig('nmoles.svg')
+#plt.savefig('nmoles.png')
 plt.show()
 '''
 opt = readInfo('out_opt.dat')
@@ -158,7 +180,7 @@ plt.tight_layout()
 for x in ['png', 'svg']:
     plt.savefig('impact_to_320_kg.%s' % x)
 plt.show()
-
+'''
 
 
 

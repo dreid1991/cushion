@@ -22,11 +22,13 @@ double calcVolDot(double velImp, double massImp, double press, double area, doub
 }
 
 double calcNDot(double press, double temp, vector<double> &holeSizes, vector<double> &molesPer, double dt) {
+    double ratioOfSpcHeats = 1.4; //dry air at 20 C, wikipedia
+
     double molPerVolume = press / (R * temp);
     double massPerMol = 0.028 * .79 + 0.032 * .21; //79% N2, 21% O2
     double massPerVol = molPerVolume * massPerMol;
 
-    double gasVel = sqrt(2/massPerVol * (press - pAtm));
+    double gasVel = sqrt(2/massPerVol * (ratioOfSpcHeats/(ratioOfSpcHeats-1) * (press - pAtm));
     double nDot = 0;
     for (int i=0; i<holeSizes.size(); i++) {
         double nDotThis = -holeSizes[i] * gasVel * molPerVolume;
@@ -70,7 +72,7 @@ ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, d
     };
     appendData();
     int i=0;
-    while (velImpNext > .0001*velImpInit and vol > volInit*0.01 and 1000 > time and i < 3000) {
+    while (velImpNext > .0001*velImpInit and vol > volInit*0.01 and 1000 > time) {
         double dt = fmin(100 * dtInit, dtInit * sqrt(velImpInit / velImp));
         //printf("NEW TURN\n");
         double volDot = calcVolDot(velImp, massImp, press, area, dt, &velImpNext);
@@ -88,6 +90,7 @@ ImpactResult runSimulation(double velImpInit, double massImp, double tempInit, d
         if (!(i%writeEvery)) {
             appendData();
         }
+        //printf("vel imp next %f\n", velImp);
         i++;
     }
     res.failed = false;
